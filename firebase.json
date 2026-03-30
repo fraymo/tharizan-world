@@ -1,0 +1,9 @@
+{
+  "hosting": {
+    "target": "tharizan",
+    "source": "hosting",
+    "frameworksBackend": {
+      "region": "asia-east1"
+    }
+  }
+}

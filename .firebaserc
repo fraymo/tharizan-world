@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "modern-hub-d8090"
+  },
+  "targets": {
+    "modern-hub-d8090": {
+      "hosting": {
+        "tharizan": [
+          "tharizan"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
