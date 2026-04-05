@@ -1,5 +1,5 @@
 import React from "react";
-import {fetchApi, getCustomerEmail, seller_email} from "@/utils/util";
+import {buildProductPath, fetchApi, getCustomerEmail, getStoredTenant, getTenantHeaders, withTenant} from "@/utils/util";
 import {formatCurrency} from "@/utils/formatCurrency";
 import {useDebouncedFetch} from "./useDebouncedFetch";
 import {useRouter} from "next/navigation";
@@ -8,10 +8,10 @@ const App = ({query}) => {
     const router = useRouter();
     const {data: products = [], loading, error} = useDebouncedFetch(async ({signal}) => {
             return await fetchApi("/searchProduct", {
-                headers: {'Content-Type': 'application/json',  'x-user': seller_email},
-                method: "POST", body: {
-                    seller_email, customer_email: getCustomerEmail(), query,
-                }, signal,
+                headers: getTenantHeaders(),
+                method: "POST", body: withTenant({
+                    customer_email: getCustomerEmail(), query,
+                }), signal,
             });
         }, [query], // dependencies (debounced on query change)
         500      // debounce delay (ms)
@@ -21,8 +21,7 @@ const App = ({query}) => {
         e.preventDefault();
         if(product.status === "1") {
             localStorage.setItem("selected-product", JSON.stringify(product));
-            const {_id: productId, category: {_id: categoryId, name:categoryName }, title, subCategory: {_id: subCategoryId, name:subCategoryName} } = product;
-            await router.push(`/${categoryName}/${subCategoryName}/${title}?productId=${productId}`);
+            await router.push(buildProductPath(product, getStoredTenant()));
         }
     };
 

@@ -7,7 +7,7 @@ import {Navigation} from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import {ChevronLeft, ChevronRight} from "lucide-react";
-import {fetchApi} from "@/utils/util";
+import {buildCategoryPath, fetchApi, getStoredTenant, getTenantHeaders} from "@/utils/util";
 
 export default function SwiperPage() {
     const router = useRouter();
@@ -21,7 +21,7 @@ export default function SwiperPage() {
 
     // Navigate to category page
     const handleClick = (categoryName, categoryId) => {
-        router.push(`/${categoryName}?categoryId=${categoryId}`);
+        router.push(buildCategoryPath(categoryName, categoryId, getStoredTenant()));
     };
 
     // Fetch categories from API
@@ -32,9 +32,7 @@ export default function SwiperPage() {
             try {
                 const apiUrl = `/getAllCategory`;
                 const data = await fetchApi(apiUrl, {
-                    headers: {
-                        'X-USER': process.env.NEXT_PUBLIC_SELLER_EMAIL,
-                    }
+                    headers: getTenantHeaders()
                 });
                 setCategories(data);
             } catch (e) {

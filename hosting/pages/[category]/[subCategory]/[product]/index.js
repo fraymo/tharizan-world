@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import Item from "@/components/item";
 import {useRouter} from 'next/router';
 import FlashSale from "@/components/flashsales";
-import {fetchApi, seller_email} from "@/utils/util";
+import {fetchApi, getTenantHeaders} from "@/utils/util";
 
 const Index = () => {
     const router = useRouter();
@@ -33,9 +33,7 @@ const Index = () => {
 
                 const data = await fetchApi(query, {
                     method: "GET",
-                    headers: {
-                        "x-user": seller_email,
-                    },
+                    headers: getTenantHeaders(),
                 });
 
                 const matchedProduct = data?.data?.find((item) => item._id === productId);

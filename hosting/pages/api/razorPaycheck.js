@@ -1,15 +1,16 @@
-import {fetchApi, seller_email} from "@/utils/util";
+import {fetchApi} from "@/utils/util";
 
 export default async function handler(req, res) {
     try {
         const body = {
-            ...req.query, ...req.body, seller_email: process.env.NEXT_PUBLIC_SELLER_EMAIL,
+            ...req.query, ...req.body,
         };
+        const sellerEmail = body.seller_email;
 
         console.log("[debug body]", body);
 
         const apiResponse = await fetchApi("/posts/razor-status", {
-            headers: {'Content-Type': 'application/json',  'x-user': seller_email},
+            headers: {'Content-Type': 'application/json',  'x-user': sellerEmail},
             method: "POST", body
         });
 

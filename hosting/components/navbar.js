@@ -18,8 +18,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import { resetCart } from "@/redux/cartSlice";
-import { fetchApi, seller_email } from "@/utils/util";
+import { buildCategoryPath, buildTenantPath, fetchApi, getSellerEmail, getTenantHeaders, withTenant } from "@/utils/util";
 import { resetWishlist } from "@/redux/wishlistSlice";
+import {useStorefront} from "@/context/StorefrontContext";
 
 const TRENDING_LABELS = [
   "New Arrivals",
@@ -31,7 +32,15 @@ const TRENDING_LABELS = [
 export default function Navbar() {
   const router = useRouter();
   const dispatch = useDispatch();
+  const {tenant} = useStorefront();
   const cartItems = useSelector((state) => state.cart?.items || []);
+  const defaultSlug = process.env.NEXT_PUBLIC_DEFAULT_STORE_SLUG || "modern-hub";
+  const isSellerStorefront = Boolean(tenant?.slug && tenant.slug !== defaultSlug);
+  const brandName = isSellerStorefront ? (tenant?.storeName || tenant?.sellerName || "Seller Store") : "Modern Hub";
+  const brandTagline = isSellerStorefront ? "Seller Storefront" : "Official Store";
+  const brandLogo = tenant?.logo || "/logo.jpg";
+  const homeHref = isSellerStorefront ? `/${tenant.slug}` : "/";
+  const socialLinks = tenant?.socialLinks || {};
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,14 +61,15 @@ export default function Navbar() {
 
   useEffect(() => {
     const fetchMenus = async () => {
+      if (!tenant?.sellerEmail) {
+        return;
+      }
       try {
         setLoadingMenus(true);
         const data = await fetchApi("/get-menus", {
           method: "POST",
-          headers: {
-            "x-user": seller_email,
-          },
-          body: { seller_email },
+          headers: getTenantHeaders({}, tenant),
+          body: withTenant({}, tenant),
         });
         setMenuItems(Array.isArray(data) ? data : []);
       } catch (error) {
@@ -70,13 +80,13 @@ export default function Navbar() {
     };
 
     fetchMenus();
-  }, []);
+  }, [tenant?.sellerEmail, tenant?.sellerId]);
 
   const featuredMenus = useMemo(() => menuItems.slice(0, 5), [menuItems]);
   const extraMenus = useMemo(() => menuItems.slice(5), [menuItems]);
 
   const gotoLogin = () => {
-    router.push("/loginpage");
+    router.push(buildTenantPath("/loginpage", tenant));
   };
 
   const handleLogout = () => {
@@ -84,7 +94,7 @@ export default function Navbar() {
     setIsLoggedIn(false);
     dispatch(resetCart({}));
     dispatch(resetWishlist({}));
-    router.push("/");
+    router.push(homeHref);
   };
 
   const handleSearchChange = (e) => {
@@ -93,7 +103,8 @@ export default function Navbar() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    router.push(`/search${searchQuery ? `?query=${encodeURIComponent(searchQuery)}` : ""}`);
+    const basePath = buildTenantPath("/search", tenant);
+    router.push(`${basePath}${searchQuery ? `?query=${encodeURIComponent(searchQuery)}` : ""}`);
     setShowDesktopSearch(false);
     setShowMobileSearch(false);
   };
@@ -101,7 +112,9 @@ export default function Navbar() {
   const goToProductList = async (event, category, subCategory) => {
     event.preventDefault();
     try {
-      const url = `/${encodeURIComponent(category.name)}/${encodeURIComponent(subCategory.name)}?categoryId=${category.id}&subCategoryId=${subCategory.id}&_ts=${Date.now()}`;
+      const basePath = buildCategoryPath(category.name, category.id, tenant);
+      const separator = basePath.includes("?") ? "&" : "?";
+      const url = `${basePath}${separator}subCategoryId=${subCategory.id}&subCategory=${encodeURIComponent(subCategory.name)}&_ts=${Date.now()}`;
       setDesktopOpenMenu(null);
       setIsMobileMenuOpen(false);
       await router.push(url);
@@ -167,35 +180,35 @@ export default function Navbar() {
             </div>
 
             <div className="flex items-center gap-4 text-sm text-gray-500">
-              <a
-                href="https://www.instagram.com/diya_jewelz?igsh=aW1maGJpdXBtYmxw"
+              {socialLinks.instagram ? <a
+                href={socialLinks.instagram}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="transition hover:text-black"
                 aria-label="Instagram"
               >
                 <FaInstagram />
-              </a>
-              <a
-                href="https://www.facebook.com/share/1aqFcp5nAK/"
+              </a> : null}
+              {socialLinks.facebook ? <a
+                href={socialLinks.facebook}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="transition hover:text-black"
                 aria-label="Facebook"
               >
                 <FaFacebookF />
-              </a>
+              </a> : null}
             </div>
           </div>
         </div>
 
         <nav className="container mx-auto hidden items-center justify-between gap-6 px-4 py-4 md:flex">
           <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.jpg" alt="Tharizan World" width={52} height={52} className="rounded-2xl" />
+            <Link href={homeHref} className="flex items-center gap-3">
+              <Image src={brandLogo} alt={brandName} width={52} height={52} className="rounded-2xl" unoptimized />
               <div>
-                <div className="text-lg font-semibold tracking-tight text-gray-900">Tharizan World</div>
-                <div className="text-xs uppercase tracking-[0.35em] text-gray-400">Modern Store</div>
+                <div className="text-lg font-semibold tracking-tight text-gray-900">{brandName}</div>
+                <div className="text-xs uppercase tracking-[0.35em] text-gray-400">{brandTagline}</div>
               </div>
             </Link>
           </div>
@@ -288,14 +301,14 @@ export default function Navbar() {
             {isLoggedIn ? (
               <>
                 <button
-                  onClick={() => router.push("/orders")}
+                  onClick={() => router.push(buildTenantPath("/orders", tenant))}
                   className="rounded-full border border-gray-200 p-3 text-gray-700 transition hover:border-gray-900 hover:text-black"
                   aria-label="Orders"
                 >
                   <ShoppingBag size={18} />
                 </button>
                 <button
-                  onClick={() => router.push("/accounts")}
+                  onClick={() => router.push(buildTenantPath("/accounts", tenant))}
                   className="rounded-full border border-gray-200 p-3 text-gray-700 transition hover:border-gray-900 hover:text-black"
                   aria-label="Account"
                 >
@@ -320,7 +333,7 @@ export default function Navbar() {
             )}
 
             <Link
-              href="/cart"
+              href={buildTenantPath("/cart", tenant)}
               className="relative rounded-full border border-gray-900 bg-gray-900 p-3 text-white transition hover:bg-black"
               aria-label="Cart"
             >
@@ -344,11 +357,11 @@ export default function Navbar() {
               <Menu size={20} />
             </button>
 
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.jpg" alt="Tharizan World" width={40} height={40} className="rounded-2xl" />
+            <Link href={homeHref} className="flex items-center gap-3">
+              <Image src={brandLogo} alt={brandName} width={40} height={40} className="rounded-2xl" unoptimized />
               <div>
-                <div className="text-sm font-semibold text-gray-900">Tharizan World</div>
-                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-400">Trending</div>
+                <div className="text-sm font-semibold text-gray-900">{brandName}</div>
+                <div className="text-[10px] uppercase tracking-[0.3em] text-gray-400">{brandTagline}</div>
               </div>
             </Link>
 
@@ -360,7 +373,7 @@ export default function Navbar() {
               >
                 <Search size={18} />
               </button>
-              <Link href="/cart" className="relative rounded-full border border-gray-900 bg-gray-900 p-2.5 text-white">
+              <Link href={buildTenantPath("/cart", tenant)} className="relative rounded-full border border-gray-900 bg-gray-900 p-2.5 text-white">
                 <ShoppingBag size={18} />
                 {cartItems.length > 0 ? (
                   <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
@@ -489,11 +502,11 @@ export default function Navbar() {
           <div className="mt-8 space-y-3 border-t border-gray-200 pt-6">
             {isLoggedIn ? (
               <>
-                <button onClick={() => router.push("/orders")} className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800">
+                <button onClick={() => router.push(buildTenantPath("/orders", tenant))} className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800">
                   <ShoppingBag size={18} />
                   Orders
                 </button>
-                <button onClick={() => router.push("/accounts")} className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800">
+                <button onClick={() => router.push(buildTenantPath("/accounts", tenant))} className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800">
                   <List size={18} />
                   Account
                 </button>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { fetchApi, seller_email } from "@/utils/util";
+import { fetchApi, getTenantHeaders } from "@/utils/util";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 const ProductSkeleton = () => (
@@ -24,7 +24,7 @@ export default function TopPicks() {
     const fetchProducts = async () => {
       try {
         const data = await fetchApi(`/posts/top-picks`, {
-          headers: { "Content-Type": "application/json", "x-user": seller_email },
+          headers: getTenantHeaders(),
         });
         setProducts(data);
       } catch (err) {

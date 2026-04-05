@@ -7,7 +7,7 @@ import ProductCardSkeleton from "./ProductCardSkeleton";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart, removeFromCart, updateCartQuantity } from "@/redux/cartSlice";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { getCustomerEmail, handleAddToCartEvent, handleQuantityChangeEvent } from "@/utils/util";
+import { buildProductPath, getCustomerEmail, getStoredTenant, handleAddToCartEvent, handleQuantityChangeEvent } from "@/utils/util";
 import { HeartIcon as HeartIconOutline } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { addToWishlist, removeFromWishlist } from "@/redux/wishlistSlice";
@@ -42,13 +42,7 @@ export default function FlashSale({ isTopPicks, newArrivals }) {
   const gotoProduct = async (e, product) => {
     e.preventDefault();
     localStorage.setItem("selected-product", JSON.stringify(product));
-    const {
-      _id: productId,
-      category: { name: categoryName },
-      title,
-      subCategory: { name: subCategoryName },
-    } = product;
-    await router.push(`/${categoryName}/${subCategoryName}/${title}?productId=${productId}`);
+    await router.push(buildProductPath(product, getStoredTenant()));
   };
 
   const handleWishlistToggle = (e, product, isWishlist) => {
@@ -66,31 +60,39 @@ export default function FlashSale({ isTopPicks, newArrivals }) {
 
   return (
     <section className="py-6 px-4">
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-4 rounded-[28px] border border-gray-200 bg-gradient-to-b from-white to-gray-50 px-6 py-6 text-center shadow-sm">
-        <div className="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-gray-500">
-          {sectionBadge}
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">{sectionTitle}</h2>
-          <p className="text-sm text-gray-500">Trending products selected for fast browsing and quick shopping.</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {trendingTags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
-            >
-              {tag}
-            </span>
-          ))}
+      <div className="mx-auto max-w-[1400px]">
+        <div className="rounded-[30px] border border-gray-200 bg-gradient-to-b from-white to-gray-50 px-6 py-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-gray-500">
+                {sectionBadge}
+              </div>
+              <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{sectionTitle}</h2>
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                Trending products selected for fast browsing and quick shopping.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {trendingTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
-        {(isLoading || error) && Array.from({ length: 4 }).map((_, index) => <ProductCardSkeleton key={index} />)}
-        {!isLoading &&
-          !error &&
-          data.data?.map((product) => {
+      <div className="mx-auto mt-5 max-w-[1400px]">
+        <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
+          {(isLoading || error) && Array.from({ length: 4 }).map((_, index) => <ProductCardSkeleton key={index} />)}
+          {!isLoading &&
+            !error &&
+            data?.data?.map((product) => {
             const cartItem = cart.find((item) => item.productId === product._id);
             const wishListItem = wishlist.find((item) => item.productId === product._id);
             const isCartLoading = cartStatus === "loading";
@@ -198,6 +200,7 @@ export default function FlashSale({ isTopPicks, newArrivals }) {
               </div>
             );
           })}
+        </div>
       </div>
     </section>
   );

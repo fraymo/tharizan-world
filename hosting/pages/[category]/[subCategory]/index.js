@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import { useParams } from "next/navigation";
-import {fetchApi, seller_email} from "@/utils/util";
+import {fetchApi, getTenantHeaders} from "@/utils/util";
 import NoProductsFound from "@/components/NoProductFound";
 import { useRouter } from "next/router";
 
@@ -33,9 +33,7 @@ export default function ProductGrid() {
                    const data = await fetchApi(
                        `/posts/new-arrivals?category=${categoryId}&subCategory=${subCategoryId}&page=${currentPage}&limit=${limit}`, {
                            method: 'GET',
-                           headers: {
-                               'x-user':seller_email
-                           }
+                           headers: getTenantHeaders()
                        }
                    );
                    // Assuming API returns { products: [...], totalPages: X }

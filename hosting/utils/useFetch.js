@@ -1,30 +1,30 @@
 import useSWR from "swr";
-import {fetchApi} from "@/utils/util";
+import {fetchApi, getTenantHeaders} from "@/utils/util";
+import {useStorefront} from "@/context/StorefrontContext";
 
-// Default fetcher for SWR
-const fetcher = (url, email) => fetchApi(url, {headers: {'X-USER': email}});
-const email = process.env.NEXT_PUBLIC_SELLER_EMAIL;
-/**
- * useFetch - Reusable SWR hook
- * @param {string|null} url - API endpoint (null disables fetch)
- * @param {object} options - SWR options (e.g., revalidateOnFocus, refreshInterval)
- */
+const fetcher = (url, tenant) => fetchApi(url, {headers: getTenantHeaders({}, tenant)});
+
 export default function useFetch(url, options = {}) {
+    const {tenant} = useStorefront();
+    const enabled = Boolean(url && tenant?.sellerEmail);
 
-    const {data, error, isLoading, mutate} = useSWR([url, email], ([url, id]) => fetcher(url, id), {
-        // 🚫 turn off ALL automatic revalidations
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-        refreshInterval: 0,
-        dedupingInterval: Infinity, // 🚫 never auto refetch within interval
-        shouldRetryOnError: false,  // 🚫 don’t retry
-        ...options,
-    });
+    const {data, error, isLoading, mutate} = useSWR(
+        enabled ? [url, tenant] : null,
+        ([requestUrl, requestTenant]) => fetcher(requestUrl, requestTenant),
+        {
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+            refreshInterval: 0,
+            dedupingInterval: Infinity,
+            shouldRetryOnError: false,
+            ...options,
+        }
+    );
 
     return {
         data,
         error,
-        isLoading,
-        mutate, // allows manual refresh
+        isLoading: enabled ? isLoading : false,
+        mutate,
     };
 }

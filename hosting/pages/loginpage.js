@@ -3,11 +3,12 @@
 import React, {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/router"; // Import useRouter for redirection
 import {auth, RecaptchaVerifier, signInWithPhoneNumber, googleProvider, signInWithPopup} from "@/utils/firebase";
-import {fetchApi, seller_email} from "@/utils/util";
+import {fetchApi, getStoredTenant, getTenantHeaders, withTenant} from "@/utils/util";
 import {updateCartFromLocalStorage} from "@/redux/cartSlice";
 import {useDispatch} from "react-redux";
 import {updateWishlistFromLocalStorage} from "@/redux/wishlistSlice";
 import {ArrowRight, CheckCircle2, LockKeyhole, Phone, ShieldCheck, Sparkles, Star} from "lucide-react";
+import {useStorefront} from "@/context/StorefrontContext";
 
 const trustPoints = [
     "Fast Google sign-in with one secure step",
@@ -32,6 +33,18 @@ const LoginPage = () => {
     const dispatch = useDispatch();
     const router = useRouter(); // Initialize the router
     const recaptchaVerifierRef = useRef(null);
+    const {tenant: storefrontTenant} = useStorefront();
+    const tenant = storefrontTenant || getStoredTenant();
+    const storeName = tenant?.storeName || tenant?.sellerName || "Storefront";
+    const storeTagline = tenant?.slogan || "Shop your saved cart, wishlist, and checkout details in one place.";
+    const storeIdentity = tenant?.slug || tenant?.sellerEmail || storeName;
+    const getRedirectUrl = () => {
+        const redirectUrl = Array.isArray(router.query.redirect)
+            ? router.query.redirect[0]
+            : router.query.redirect;
+
+        return redirectUrl || (tenant?.slug ? `/${tenant.slug}/cart` : "/cart");
+    };
 
     // Initialize reCAPTCHA verifier once on component mount
     useEffect(() => {
@@ -88,11 +101,12 @@ const LoginPage = () => {
                         event: "USER_LOGGED_IN",
                         user: {
                             phone: fullPhoneNumber,
-                            seller_email
+                            seller_email: tenant?.sellerEmail,
+                            seller_id: tenant?.sellerId
                         },
                         headers: {
                             'X-API-KEY': process.env.NEXT_PUBLIC_API_KEY,
-                            'x-user': seller_email
+                            'x-user': tenant?.sellerEmail
                         },
                         uri: process.env.NEXT_PUBLIC_API_BASE_URL + '/fcm'
                     }));
@@ -102,25 +116,19 @@ const LoginPage = () => {
             }
 
             const {token, cart, wishlist, ...rData} = await fetchApi(apiUrl, {
-                method: 'POST', headers: {
-                    'Content-Type': 'application/json',
-                    'x-user': seller_email,
-                }, body: {phone: fullPhoneNumber, otp, cart: localCart, seller_email}
+                method: 'POST', headers: getTenantHeaders({}, tenant), body: withTenant({phone: fullPhoneNumber, otp, cart: localCart}, tenant)
             });
 
             // Step 3: Store the token/session data from your API in local storage
             localStorage.setItem('authToken', token);
-            localStorage.setItem('user', JSON.stringify({...rData,phone: fullPhoneNumber,seller_email, userId: rData._id || rData.upsertedId || rData.userId, _id: rData._id || rData.upsertedId || rData.userId })); // Optional: store user info
+            localStorage.setItem('user', JSON.stringify({...rData, phone: fullPhoneNumber, seller_email: tenant?.sellerEmail, seller_id: tenant?.sellerId, userId: rData._id || rData.upsertedId || rData.userId, _id: rData._id || rData.upsertedId || rData.userId }));
             localStorage.setItem('cart', JSON.stringify(cart));
             localStorage.setItem('wishlist', JSON.stringify(wishlist));
             localStorage.setItem('customer_email', fullPhoneNumber);
             dispatch(updateCartFromLocalStorage(cart));
             dispatch(updateWishlistFromLocalStorage(wishlist));
             // Step 4: Redirect the user
-            const redirectUrl = Array.isArray(router.query.redirect)
-                ? router.query.redirect[0]
-                : (router.query.redirect || '/');
-            await router.push(redirectUrl);
+            await router.push(getRedirectUrl());
 
         } catch (err) {
             console.error("Failed to verify OTP or sign in:", err);
@@ -182,11 +190,12 @@ const LoginPage = () => {
                         event: "USER_LOGGED_IN",
                         user: {
                             email: email,
-                            seller_email
+                            seller_email: tenant?.sellerEmail,
+                            seller_id: tenant?.sellerId
                         },
                         headers: {
                             'X-API-KEY': process.env.NEXT_PUBLIC_API_KEY,
-                            'x-user': seller_email
+                            'x-user': tenant?.sellerEmail
                         },
                         uri: process.env.NEXT_PUBLIC_API_BASE_URL + '/fcm'
                     }));
@@ -196,24 +205,18 @@ const LoginPage = () => {
             }
 
             const {token, cart, wishlist, ...rData} = await fetchApi(apiUrl, {
-                method: 'POST', headers: {
-                    'Content-Type': 'application/json',
-                    'x-user': seller_email,
-                }, body: {email, displayName, photoURL, phone: fullPhoneNumber, cart: localCart, seller_email}
+                method: 'POST', headers: getTenantHeaders({}, tenant), body: withTenant({email, displayName, photoURL, phone: fullPhoneNumber, cart: localCart}, tenant)
             });
 
             localStorage.setItem('authToken', token);
-            localStorage.setItem('user', JSON.stringify({...rData, email, phone: fullPhoneNumber, seller_email, userId: rData._id || rData.upsertedId || rData.userId, _id: rData._id || rData.upsertedId || rData.userId }));
+            localStorage.setItem('user', JSON.stringify({...rData, email, phone: fullPhoneNumber, seller_email: tenant?.sellerEmail, seller_id: tenant?.sellerId, userId: rData._id || rData.upsertedId || rData.userId, _id: rData._id || rData.upsertedId || rData.userId }));
             localStorage.setItem('cart', JSON.stringify(cart));
             localStorage.setItem('wishlist', JSON.stringify(wishlist));
             localStorage.setItem('customer_email', fullPhoneNumber);
             dispatch(updateCartFromLocalStorage(cart));
             dispatch(updateWishlistFromLocalStorage(wishlist));
 
-            const redirectUrl = Array.isArray(router.query.redirect)
-                ? router.query.redirect[0]
-                : (router.query.redirect || '/');
-            await router.push(redirectUrl);
+            await router.push(getRedirectUrl());
 
         } catch (err) {
             console.error("Google Login Completion Error:", err);
@@ -240,18 +243,39 @@ const LoginPage = () => {
                     <div className="relative z-10">
                         <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
                             <Sparkles className="h-4 w-4 text-amber-300"/>
-                            Tharizan World
+                            {storeName}
                         </div>
                         <div className="mt-8 max-w-xl">
                             <p className="text-sm font-medium uppercase tracking-[0.35em] text-rose-200/80">
-                                Trending login experience
+                                Storefront sign-in
                             </p>
                             <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">
-                                Sign in to a sharper, premium shopping experience.
+                                Sign in to continue shopping with {storeName}.
                             </h1>
                             <p className="mt-5 max-w-lg text-sm leading-7 text-slate-200 sm:text-base">
-                                A modern entry point built for fast access, cleaner trust signals, and a smoother handoff from discovery to checkout.
+                                {storeTagline}
                             </p>
+                        </div>
+                    </div>
+
+                    <div className="relative z-10 mt-8 rounded-[1.75rem] border border-white/10 bg-white/10 p-5 backdrop-blur-sm">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-300">Signing into</p>
+                        <div className="mt-3 flex items-center gap-4">
+                            {tenant?.logo ? (
+                                <img
+                                    src={tenant.logo}
+                                    alt={storeName}
+                                    className="h-14 w-14 rounded-2xl border border-white/15 object-cover"
+                                />
+                            ) : (
+                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-lg font-semibold text-white">
+                                    {storeName.charAt(0)}
+                                </div>
+                            )}
+                            <div>
+                                <p className="text-lg font-semibold text-white">{storeName}</p>
+                                <p className="mt-1 text-sm text-slate-300">{storeIdentity}</p>
+                            </div>
                         </div>
                     </div>
 
@@ -387,7 +411,7 @@ const LoginPage = () => {
                         </div>
 
                         <p className="mt-6 text-xs leading-6 text-slate-500">
-                            By continuing, you agree to a secure account session for Tharizan World access, wishlist sync, and support communication.
+                            By continuing, you agree to a secure account session for {storeName}, including cart sync, wishlist recovery, and order communication.
                         </p>
 
                         <div className="mt-6 flex flex-wrap gap-3 text-xs font-medium text-slate-500">

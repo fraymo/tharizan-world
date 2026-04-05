@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import {useRouter} from 'next/navigation';
-import {ArrowLeftIcon} from '@heroicons/react/24/outline';
+import {Mail, PhoneCall} from "lucide-react";
+import {useStorefront} from "@/context/StorefrontContext";
 
 export default function ContactPage() {
-    const router = useRouter();
+    const {tenant} = useStorefront();
+    const storeName = tenant?.storeName || tenant?.sellerName || "our storefront";
 
     const handleCall = () => {
         window.location.href = 'tel:9043643573';
@@ -16,48 +17,46 @@ export default function ContactPage() {
     };
 
     return (
-        <div className="min-h-screen pt-16 bg-white">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-4 bg-gray-900 text-white text-lg font-semibold">
-                <ArrowLeftIcon
-                    className="w-5 h-5 cursor-pointer"
-                    onClick={() => router.back()}
-                />
-                Contact Us
-            </div>
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff8f3_0%,#ffffff_42%,#f8fafc_100%)] px-4 pb-16 pt-24 sm:px-6">
+            <div className="mx-auto max-w-4xl">
+                <div className="overflow-hidden rounded-[34px] border border-gray-200 bg-white shadow-sm">
+                    <div className="bg-[linear-gradient(135deg,#111827_0%,#1f2937_52%,#7c2d12_100%)] px-6 py-8 text-white sm:px-8">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em]">
+                            <PhoneCall className="h-4 w-4"/>
+                            Contact us
+                        </div>
+                        <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Need help from {storeName}?</h1>
+                        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200">
+                            Reach out for order help, product questions, or support with your storefront shopping experience.
+                        </p>
+                    </div>
 
-            {/* Content */}
-            <div className="pt-24 flex flex-col items-center px-6 text-center">
-                {/* Image */}
-                {/* <img
-          src="/contact-illustration.png"
-          alt="Contact"
-          className="w-36 h-36 mb-6"
-          onError={(e) => (e.target.style.display = 'none')}
-        /> */}
+                    <div className="grid gap-5 px-6 py-8 sm:px-8 md:grid-cols-2">
+                        <button
+                            onClick={handleCall}
+                            className="rounded-[30px] border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                            <div className="rounded-2xl bg-gray-100 p-3 w-fit">
+                                <PhoneCall className="h-6 w-6 text-gray-700"/>
+                            </div>
+                            <h2 className="mt-5 text-xl font-semibold text-gray-900">Call support</h2>
+                            <p className="mt-2 text-sm leading-6 text-gray-500">Speak directly with the support team for urgent help.</p>
+                            <p className="mt-4 text-sm font-semibold text-gray-900">9043643573</p>
+                        </button>
 
-                {/* Text */}
-                <h2 className="text-base font-semibold text-gray-800">
-                    Tingling fingertips?
-                </h2>
-                <p className="text-sm text-gray-500 mt-1 mb-6">
-                    That is a magnetic urge to get in touch with us!
-                </p>
-
-                {/* Buttons */}
-                <button
-                    onClick={handleCall}
-                    className="w-full max-w-xs mb-3 bg-white border border-pink-600 text-pink-600 font-semibold py-2 rounded-md hover:bg-pink-50 transition"
-                >
-                    Call Us Maybe
-                </button>
-
-                <button
-                    onClick={handleMail}
-                    className="w-full max-w-xs bg-white border border-pink-600 text-pink-600 font-semibold py-2 rounded-md hover:bg-pink-50 transition"
-                >
-                    Drop Us a Line
-                </button>
+                        <button
+                            onClick={handleMail}
+                            className="rounded-[30px] border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                            <div className="rounded-2xl bg-gray-100 p-3 w-fit">
+                                <Mail className="h-6 w-6 text-gray-700"/>
+                            </div>
+                            <h2 className="mt-5 text-xl font-semibold text-gray-900">Email support</h2>
+                            <p className="mt-2 text-sm leading-6 text-gray-500">Share screenshots, order IDs, or detailed queries anytime.</p>
+                            <p className="mt-4 text-sm font-semibold text-gray-900">natherfaahim26@gmail.com</p>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

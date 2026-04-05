@@ -3,6 +3,7 @@ import React from "react";
 import Items from "@/components/items";
 import { useRouter } from "next/router";
 import useFetch from "@/utils/useFetch";
+import StorefrontBySlug from "@/components/StorefrontBySlug";
 
 const ShimmerEffect = () => {
   return (
@@ -32,8 +33,12 @@ const MainCategory = () => {
   const { category, categoryId } = router.query;
 
   const { data: products, error, isLoading } = useFetch(
-    category ? `/posts/new-arrivals?category=${categoryId}&page=1&limit=20` : null
+    category && categoryId ? `/posts/new-arrivals?category=${categoryId}&page=1&limit=20` : null
   );
+
+  if (category && !categoryId) {
+    return <StorefrontBySlug slug={category} />;
+  }
 
   if (isLoading) {
     return <ShimmerEffect />;

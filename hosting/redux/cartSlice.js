@@ -1,5 +1,5 @@
 import {createAsyncThunk, createSlice} from '@reduxjs/toolkit';
-import {fetchApi} from "@/utils/util";
+import {fetchApi, getSellerEmail, getSellerId, getTenantHeaders, withTenant} from "@/utils/util";
 
 const initialState = {
     items: [],
@@ -8,18 +8,20 @@ const initialState = {
 };
 
 // Async thunk for fetching the cart
-export const fetchCart = createAsyncThunk('cart/fetchCart', async ({customer_email, seller_email}) => {
+export const fetchCart = createAsyncThunk('cart/fetchCart', async ({customer_email, seller_email, seller_id}) => {
     let cart = [];
     try {
         cart = JSON.parse(localStorage.getItem("cart")) || []
     } catch (e) {
 
     }
-    if (customer_email) {
-        cart = await fetchApi(`/cart/${customer_email}/${seller_email}`, {
-            headers: {
-                'x-user': seller_email
-            }
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
+        cart = await fetchApi(`/cart/${customer_email}/${tenant.sellerId || tenant.sellerEmail}`, {
+            headers: getTenantHeaders({}, tenant)
         });
     }
     localStorage.setItem('cart', JSON.stringify(cart));
@@ -35,6 +37,7 @@ export const addToCart = createAsyncThunk('cart/addToCart', async (product) => {
     const {
         _id,
         quantity,
+        seller_id,
         seller_email,
         customer_email,
         sellingPrice: price,
@@ -50,12 +53,13 @@ export const addToCart = createAsyncThunk('cart/addToCart', async (product) => {
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         const res = await fetchApi('/cart/add', {
-            headers: {
-                'x-user': seller_email
-            }, method: 'POST', body: {
-                seller_email,
+            headers: getTenantHeaders({}, tenant), method: 'POST', body: withTenant({
                 customer_email,
                 productId: _id,
                 quantity,
@@ -64,12 +68,13 @@ export const addToCart = createAsyncThunk('cart/addToCart', async (product) => {
                 category: categoryName,
                 subCategory: subCategoryName,
                 name
-            },
+            }, tenant),
         });
         cart = res.cart;
     } else {
         cart.push({
-            seller_email,
+            seller_id: tenant.sellerId,
+            seller_email: tenant.sellerEmail,
             customer_email,
             productId: _id,
             quantity,
@@ -86,6 +91,7 @@ export const addToCart = createAsyncThunk('cart/addToCart', async (product) => {
 
 // Async thunk for updating item quantity
 export const updateCartQuantity = createAsyncThunk('cart/updateCartQuantity', async ({
+                                                                                         seller_id,
                                                                                          seller_email,
                                                                                          customer_email,
                                                                                          productId,
@@ -102,13 +108,15 @@ export const updateCartQuantity = createAsyncThunk('cart/updateCartQuantity', as
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         const res = await fetchApi(`/cart/update`, {
-            headers: {
-                'x-user': seller_email
-            }, method: 'PUT', body: {
-                seller_email, customer_email, productId, quantity, price, category, subCategory, image, name
-            },
+            headers: getTenantHeaders({}, tenant), method: 'PUT', body: withTenant({
+                customer_email, productId, quantity, price, category, subCategory, image, name
+            }, tenant),
         });
         localStorage.setItem("cart", JSON.stringify(res.cart));
         cart = res.cart;
@@ -123,7 +131,7 @@ export const updateCartQuantity = createAsyncThunk('cart/updateCartQuantity', as
 
 // Async thunk for removing an item from the cart
 export const removeFromCart = createAsyncThunk('cart/removeFromCart', async ({
-                                                                                 seller_email, customer_email, productId
+                                                                                 seller_id, seller_email, customer_email, productId
                                                                              }) => {
     let cart = [];
     try {
@@ -131,13 +139,15 @@ export const removeFromCart = createAsyncThunk('cart/removeFromCart', async ({
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         cart = await fetchApi(`/cart/remove`, {
-            headers: {
-                'x-user': seller_email
-            }, method: 'DELETE', body: {
-                seller_email, customer_email, productId
-            }
+            headers: getTenantHeaders({}, tenant), method: 'DELETE', body: withTenant({
+                customer_email, productId
+            }, tenant)
         });
     } else {
         const index = cart.findIndex((item) => item.productId === productId);

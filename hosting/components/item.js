@@ -1,29 +1,28 @@
 "use client";
 import { useEffect, useState } from "react";
-import CartDrawer from "./cartdrawer";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { addToCart, removeFromCart, updateCartQuantity } from "@/redux/cartSlice";
 import {
-  fetchApi,
   getCustomerEmail,
   handleAddToCartEvent,
   handleQuantityChangeEvent,
-  seller_email,
 } from "@/utils/util";
 import { useDispatch, useSelector } from "react-redux";
 import GalleryForProductDetails from "@/components/GalleryForProductDetails";
 import SubProducts from "@/components/SubProducts";
 import { ChevronDown, Heart, ShieldCheck, Sparkles, Truck, TrendingUp } from "lucide-react";
+import { addToWishlist, removeFromWishlist } from "@/redux/wishlistSlice";
 
 export default function Item({ product }) {
   const [quantity, setQuantity] = useState(0);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isWishlistAdded, setWishlisAdded] = useState(false);
-  const [isWishlistChecking, setisWishlistChecking] = useState(true);
   const [openAccordion, setOpenAccordion] = useState(0);
   const cart = useSelector((state) => state.cart.items);
+  const wishlist = useSelector((state) => state.wishlist.items);
   const cartStatus = useSelector((state) => state.cart.status);
+  const wishlistStatus = useSelector((state) => state.wishlist.status);
   const dispatch = useDispatch();
+  const isWishlistAdded = wishlist.some((item) => item.productId === product._id);
+  const isWishlistChecking = wishlistStatus === "loading";
 
   const accordionItems = [
     { title: "Description", content: product.description },
@@ -48,59 +47,18 @@ export default function Item({ product }) {
     }
   }, [product._id, cart]);
 
-  const checkWishList = async () => {
-    try {
-      setisWishlistChecking(true);
-      const res = await fetchApi("/cart/checkWishlist", {
-        headers: { "Content-Type": "application/json", "x-user": seller_email },
-        method: "POST",
-        body: {
-          seller_email,
-          customer_email: getCustomerEmail(),
-          productId: product._id,
-        },
-      });
-      setWishlisAdded(res.flag);
-    } catch (e) {
-      setWishlisAdded(false);
-    } finally {
-      setisWishlistChecking(false);
+  const handleAddtoWishlist = () => {
+    if (!getCustomerEmail()) {
+      alert("please login to add to the wishlist");
+      return;
     }
-  };
 
-  useEffect(() => {
-    checkWishList();
-  }, []);
-
-  const handleAddtoWishlist = async () => {
-    try {
-      const {
-        _id: productId,
-        sellingPrice: price,
-        images: [{ Location: image }],
-        category: { name: category },
-        subCategory: { name: subCategory },
-        title: name,
-      } = product;
-      const res = await fetchApi("/cart/addWishlist", {
-        headers: { "Content-Type": "application/json", "x-user": seller_email },
-        method: "POST",
-        body: {
-          seller_email,
-          customer_email: getCustomerEmail(),
-          productId,
-          price,
-          image,
-          category,
-          subCategory,
-          name,
-          remove: isWishlistAdded,
-        },
-      });
-      setWishlisAdded(res.added);
-    } catch (e) {
-      setWishlisAdded(false);
+    if (isWishlistAdded) {
+      handleAddToCartEvent(product, dispatch, removeFromWishlist);
+      return;
     }
+
+    handleAddToCartEvent(product, dispatch, addToWishlist);
   };
 
   const AccordionItem = ({ title, content, isOpen, onClick }) => (
@@ -120,7 +78,6 @@ export default function Item({ product }) {
 
   const _handleAddToCart = () => {
     handleAddToCartEvent(product, dispatch, addToCart);
-    setIsCartOpen(true);
   };
 
   const _handleQuantityChange = (qty) => {
@@ -293,8 +250,6 @@ export default function Item({ product }) {
           </button>
         )}
       </div>
-
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </div>
   );
 }

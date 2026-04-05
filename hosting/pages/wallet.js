@@ -2,7 +2,7 @@
 import React, {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {ArrowLeftIcon, ChevronRightIcon} from '@heroicons/react/24/outline';
-import {fetchApi, getCustomerEmail, seller_email} from "@/utils/util";
+import {fetchApi, getCustomerEmail, getTenantHeaders, withTenant} from "@/utils/util";
 import {formatCurrency} from "@/utils/formatCurrency";
 
 export default function WalletPage() {
@@ -17,12 +17,9 @@ export default function WalletPage() {
     const fetchWalletData = async () => {
         try {
             const res = await fetchApi('/wallet/getTotalAmount', {
-                headers: {'Content-Type': 'application/json',  'x-user': seller_email},
+                headers: getTenantHeaders(),
                 method: 'POST',
-                body: {
-                    seller_email,
-                    customer_email,
-                }
+                body: withTenant({customer_email})
             });
             setBalance(res.amount || 0);
             setTransactions(res.transaction || []);
@@ -65,7 +62,6 @@ export default function WalletPage() {
             userId: user._id,
             phone: user.phone,
             receiptNo: "T" + Date.now(),
-            seller_email,
             customer_email: getCustomerEmail(),
             amount
         };
@@ -77,8 +73,8 @@ export default function WalletPage() {
             let response;
             try {
                 response = await fetchApi(createOrderUrl, {
-                    headers: {'Content-Type': 'application/json',  'x-user': seller_email},
-                    method: 'POST', body: orderDetails,
+                    headers: getTenantHeaders(),
+                    method: 'POST', body: withTenant(orderDetails),
                 });
             } catch (e) {
                 throw new Error(response.message || 'Failed to create the order.');
@@ -107,17 +103,16 @@ export default function WalletPage() {
                 },
                 handler: function (response) {
                     fetchApi('/wallet/add', {
-                        headers: {'Content-Type': 'application/json',  'x-user': seller_email},
-                        method: "POST", body: {
+                        headers: getTenantHeaders(),
+                        method: "POST", body: withTenant({
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_signature: response.razorpay_signature,
                             razorpay_response: response,
                             transactionId: orderDetails.receiptNo,
-                            seller_email,
                             customer_email: getCustomerEmail(),
                             amount: parseInt(amount),
-                        }
+                        })
                     }).then(data => {
                         fetchWalletData();
                     }).catch(error => {

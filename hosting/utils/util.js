@@ -1,13 +1,13 @@
 import {createApiClient} from "@fraymo/api-wrapper";
-import {store} from "@/redux/store";
 import {fetchCart} from "@/redux/cartSlice";
 import {fetchWishlist} from "@/redux/wishlistSlice";
 
-const fetchApi = createApiClient({
-    apiKey: process.env.NEXT_PUBLIC_API_KEY, baseURL: process.env.NEXT_PUBLIC_API_BASE_URL
-})
+const TENANT_STORAGE_KEY = "modern-hub-tenant";
 
-const seller_email = process.env.NEXT_PUBLIC_SELLER_EMAIL;
+const fetchApi = createApiClient({
+    apiKey: process.env.NEXT_PUBLIC_API_KEY,
+    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL
+});
 
 const getCustomerEmail = () => {
     if (typeof window !== "undefined") {
@@ -15,74 +15,149 @@ const getCustomerEmail = () => {
     }
     return null;
 };
+
+const getStoredTenant = () => {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    try {
+        const value = localStorage.getItem(TENANT_STORAGE_KEY);
+        return value ? JSON.parse(value) : null;
+    } catch (_error) {
+        return null;
+    }
+};
+
+const setStoredTenant = (tenant) => {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    if (!tenant) {
+        localStorage.removeItem(TENANT_STORAGE_KEY);
+        return;
+    }
+
+    localStorage.setItem(TENANT_STORAGE_KEY, JSON.stringify(tenant));
+};
+
+const getSellerId = () => getStoredTenant()?.sellerId || "";
+const getSellerEmail = () => getStoredTenant()?.sellerEmail || "";
+const getTenant = () => getStoredTenant();
+const getTenantSlug = () => getStoredTenant()?.slug || "";
+const sanitizePathSegment = (value = "") => encodeURIComponent(String(value).trim());
+const buildTenantPath = (path = "/", tenant = getStoredTenant()) => {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    const slug = tenant?.slug;
+
+    if (!slug) {
+        return normalizedPath;
+    }
+
+    if (normalizedPath === "/") {
+        return `/${slug}`;
+    }
+
+    return `/${slug}${normalizedPath}`;
+};
+
+const buildCategoryPath = (categoryName = "", categoryId = "", tenant = getStoredTenant()) => {
+    const pathname = buildTenantPath(`/${sanitizePathSegment(categoryName)}`, tenant);
+    return categoryId ? `${pathname}?categoryId=${encodeURIComponent(categoryId)}` : pathname;
+};
+
+const buildProductPath = (product = {}, tenant = getStoredTenant()) => {
+    const categoryName = product?.category?.name || "";
+    const subCategoryName = product?.subCategory?.name || "";
+    const title = product?.title || "";
+    const productId = product?._id || product?.productId || "";
+    const pathname = buildTenantPath(`/${sanitizePathSegment(categoryName)}/${sanitizePathSegment(subCategoryName)}/${sanitizePathSegment(title)}`, tenant);
+    return productId ? `${pathname}?productId=${encodeURIComponent(productId)}` : pathname;
+};
+
+const getTenantHeaders = (overrides = {}, tenant = getStoredTenant()) => {
+    const headers = {
+        "Content-Type": "application/json",
+        ...overrides
+    };
+
+    if (tenant?.sellerEmail) {
+        headers["x-user"] = tenant.sellerEmail;
+    }
+
+    if (tenant?.sellerId) {
+        headers["x-seller-id"] = tenant.sellerId;
+    }
+
+    return headers;
+};
+
+const withTenant = (payload = {}, tenant = getStoredTenant()) => ({
+    ...payload,
+    ...(tenant?.sellerId ? {seller_id: tenant.sellerId} : {}),
+    ...(tenant?.sellerEmail ? {seller_email: tenant.sellerEmail} : {})
+});
+
 async function sendEmail(emailData) {
     try {
-        const result = await fetchApi('/send', {
-            headers: {'Content-Type': 'application/json',  'x-user': seller_email},
-            method: 'POST', body: emailData, // e.g., { to, subject, text, html }
+        return await fetchApi("/send", {
+            headers: getTenantHeaders(),
+            method: "POST",
+            body: emailData,
         });
-
-        console.log('Email sent successfully:', result);
-        // Show a success message to the user
     } catch (error) {
-        console.error('Failed to send email:', error);
-
-        // The custom ApiError gives you rich context
-        if (error.name === 'ApiError') {
-            console.error('Status:', error.status); // e.g., 400
-            console.error('API Message:', error.data.message); // e.g., "Missing required fields."
-            // Show a specific error message to the user based on the response
-        }
+        console.error("Failed to send email:", error);
     }
 }
 
+const prepareMailContent = (list) => list.reduce((acc, item) => `${acc}${item}\n`, "");
+const prepareHTMLMailContent = (list) => list.reduce((acc, item) => `${acc}<p>${item}</p><br />`, "");
+const prepareMailContentMap = (obj) => Object.keys(obj).map((v) => `${v}: ${obj[v]}`).join("");
+const prepareHTMLMailContentMap = (obj) => Object.keys(obj).map((v) => `<p>${v}: ${obj[v]}</p><br />`).join("");
 
-const prepareMailContent = (list) => {
-    return list.reduce((acc, item) => {
-        acc += `${item}\n`;
-        return acc;
-    }, '')
-};
+const updateCart = (store, tenant = getStoredTenant()) => {
+    if (!tenant?.sellerEmail) {
+        return;
+    }
 
-const prepareHTMLMailContent = (list) => {
-    return list.reduce((acc, item) => {
-        acc += `<p>${item}</p><br />`;
-        return acc;
-    }, '')
-};
-
-const prepareMailContentMap = (obj) => {
-    return Object.keys(obj).map(v => `${v}: ${obj[v]}`).join('');
-};
-
-const prepareHTMLMailContentMap = (obj) => {
-    return Object.keys(obj).map(v => `<p>${v}: ${obj[v]}</p><br />`).join('');
-};
-
-const updateCart = (store) => {
     store.dispatch(fetchCart({
-        customer_email: getCustomerEmail(), seller_email
+        customer_email: getCustomerEmail(),
+        seller_id: tenant.sellerId,
+        seller_email: tenant.sellerEmail
     }));
+
     store.dispatch(fetchWishlist({
-        customer_email: getCustomerEmail(), seller_email
+        customer_email: getCustomerEmail(),
+        seller_id: tenant.sellerId,
+        seller_email: tenant.sellerEmail
     }));
-}
+};
 
 const handleAddToCartEvent = (product, dispatch, addToCart) => {
-    try {
-        dispatch(addToCart({
-            ...product, seller_email, customer_email: getCustomerEmail(), quantity: 1, productId: product._id
-        }));
+    const tenant = getStoredTenant();
+    if (!tenant?.sellerEmail) {
+        return;
     }
-    catch (e) {
-        console.error(e);
-    }
+
+    dispatch(addToCart({
+        ...product,
+        seller_id: tenant.sellerId,
+        seller_email: tenant.sellerEmail,
+        customer_email: getCustomerEmail(),
+        quantity: 1,
+        productId: product._id
+    }));
 };
 
 const getCartItem = (cart, product) => cart.find((item) => item.productId === product._id);
 
-
 const handleQuantityChangeEvent = (product, qty, cart, dispatch, removeFromCart, updateCartQuantity) => {
+    const tenant = getStoredTenant();
+    if (!tenant?.sellerEmail) {
+        return;
+    }
+
     const cartItem = getCartItem(cart, product);
     const {
         _id: productId,
@@ -92,15 +167,20 @@ const handleQuantityChangeEvent = (product, qty, cart, dispatch, removeFromCart,
         images: [{Location: image}],
         title: name,
     } = product;
+
     if (cartItem) {
         const newQuantity = cartItem.quantity + qty;
         if (newQuantity === 0) {
             dispatch(removeFromCart({
-                seller_email, customer_email: getCustomerEmail(), productId,
+                seller_id: tenant.sellerId,
+                seller_email: tenant.sellerEmail,
+                customer_email: getCustomerEmail(),
+                productId,
             }));
         } else {
             dispatch(updateCartQuantity({
-                seller_email,
+                seller_id: tenant.sellerId,
+                seller_email: tenant.sellerEmail,
                 customer_email: getCustomerEmail(),
                 productId,
                 quantity: newQuantity,
@@ -115,31 +195,45 @@ const handleQuantityChangeEvent = (product, qty, cart, dispatch, removeFromCart,
 };
 
 const handleRemoveFromCartEvent = (product, dispatch, removeFromCart) => {
+    const tenant = getStoredTenant();
+    if (!tenant?.sellerEmail) {
+        return;
+    }
+
     dispatch(removeFromCart({
-        ...product, seller_email, customer_email: getCustomerEmail(), productId: product._id
+        ...product,
+        seller_id: tenant.sellerId,
+        seller_email: tenant.sellerEmail,
+        customer_email: getCustomerEmail(),
+        productId: product._id
     }));
 };
 
 const registerFCMToken = async (data) => {
-    try{
+    const tenant = getStoredTenant();
+    if (!tenant?.sellerEmail) {
+        return {};
+    }
+
+    try {
         const appUrl = process.env.NEXT_PUBLIC_HALALO_CLIENT_PORT;
-        const param = `/?f=${encodeURIComponent(JSON.stringify(data))}&seller_email=${encodeURIComponent(seller_email)}&customer_email=${encodeURIComponent(getCustomerEmail())}`;
+        const param = `/?f=${encodeURIComponent(JSON.stringify(data))}&seller_id=${encodeURIComponent(tenant.sellerId)}&seller_email=${encodeURIComponent(tenant.sellerEmail)}&customer_email=${encodeURIComponent(getCustomerEmail())}`;
         const url = `${appUrl}/api/fcm${param}`;
         return await fetch(url, {
-            method: 'POST',
-            body: {
+            method: "POST",
+            body: JSON.stringify(withTenant({
                 f: data,
-                seller_email,
                 customer_email: getCustomerEmail(),
+            }, tenant)),
+            headers: {
+                "Content-Type": "application/json"
             }
         });
+    } catch (error) {
+        console.error(error);
     }
-    catch (e) {
-        console.error(e);
-    }
-    return  {};
+    return {};
 };
-
 
 export {
     sendEmail,
@@ -149,12 +243,22 @@ export {
     prepareHTMLMailContentMap,
     fetchApi,
     updateCart,
-    seller_email,
     getCustomerEmail,
     handleAddToCartEvent,
     handleQuantityChangeEvent,
     getCartItem,
     handleRemoveFromCartEvent,
-    registerFCMToken
-}
-
+    registerFCMToken,
+    TENANT_STORAGE_KEY,
+    getStoredTenant,
+    setStoredTenant,
+    getSellerId,
+    getSellerEmail,
+    getTenant,
+    getTenantSlug,
+    getTenantHeaders,
+    withTenant,
+    buildTenantPath,
+    buildCategoryPath,
+    buildProductPath
+};

@@ -3,13 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { fetchApi, seller_email } from "@/utils/util";
+import { buildProductPath, fetchApi, getTenantHeaders } from "@/utils/util";
 import { ArrowUpRight, Filter, SlidersHorizontal, Sparkles, TrendingUp, X } from "lucide-react";
+import {useStorefront} from "@/context/StorefrontContext";
 
 const COLLECTION_TAGS = ["New In", "Best Sellers", "Top Rated", "Fast Moving"];
 
 export default function Items({ category, products: initialProducts, categoryId }) {
   const router = useRouter();
+  const {tenant} = useStorefront();
   const [products, setProducts] = useState(initialProducts);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 60000]);
@@ -26,9 +28,7 @@ export default function Items({ category, products: initialProducts, categoryId 
       try {
         const data = await fetchApi(`/posts/new-arrivals?category=${categoryId}&page=${currentPage}&limit=${productsPerPage}`, {
           method: "GET",
-          headers: {
-            "x-user": seller_email,
-          },
+          headers: getTenantHeaders({}, tenant),
         });
         setProducts(data.data || []);
         setTotalPages(data.totalPages || 1);
@@ -38,7 +38,7 @@ export default function Items({ category, products: initialProducts, categoryId 
     };
 
     fetchProducts();
-  }, [categoryId, currentPage]);
+  }, [categoryId, currentPage, tenant?.sellerEmail, tenant?.sellerId]);
 
   const filteredProducts = useMemo(() => {
     return (products || []).filter((product) => {
@@ -61,13 +61,7 @@ export default function Items({ category, products: initialProducts, categoryId 
   const gotoProduct = async (e, product) => {
     e.preventDefault();
     localStorage.setItem("selected-product", JSON.stringify(product));
-    const {
-      _id: productId,
-      category: { name: categoryName },
-      title,
-      subCategory: { name: subCategoryName },
-    } = product;
-    await router.push(`/${categoryName}/${subCategoryName}/${title}?productId=${productId}`);
+    await router.push(buildProductPath(product, tenant));
   };
 
   const clearFilters = () => {

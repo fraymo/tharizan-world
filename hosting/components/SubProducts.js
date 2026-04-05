@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import {fetchApi, handleAddToCartEvent, handleQuantityChangeEvent, seller_email} from "@/utils/util";
+import {fetchApi, getTenantHeaders, handleAddToCartEvent, handleQuantityChangeEvent} from "@/utils/util";
 import {formatCurrency} from "@/utils/formatCurrency";
 import {addToCart, removeFromCart, updateCartQuantity} from "@/redux/cartSlice";
 import {useDispatch, useSelector} from "react-redux";
@@ -20,9 +20,7 @@ export default function SubProducts({ids}) {
                     body: {
                         ids
                     },
-                    headers:{
-                        'x-user': seller_email
-                    }
+                    headers: getTenantHeaders()
                 });
                 setProducts(data);
             } catch (err) {

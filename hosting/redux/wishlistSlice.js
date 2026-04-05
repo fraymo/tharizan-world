@@ -1,5 +1,5 @@
 import {createAsyncThunk, createSlice} from '@reduxjs/toolkit';
-import {fetchApi} from "@/utils/util";
+import {fetchApi, getSellerEmail, getSellerId, getTenantHeaders, withTenant} from "@/utils/util";
 
 const initialState = {
     items: [],
@@ -8,7 +8,7 @@ const initialState = {
 };
 
 // Async thunk for fetching the wishlist
-export const fetchWishlist = createAsyncThunk('wishlist/fetchWishlist', async ({customer_email, seller_email}) => {
+export const fetchWishlist = createAsyncThunk('wishlist/fetchWishlist', async ({customer_email, seller_email, seller_id}) => {
     let wishlist = [];
     console.log('[fetchWishlist]')
     try {
@@ -16,16 +16,17 @@ export const fetchWishlist = createAsyncThunk('wishlist/fetchWishlist', async ({
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         wishlist = await fetchApi(`/cart/getWishlist`,{
-            headers: {
-                'x-user': seller_email
-            },
+            headers: getTenantHeaders({}, tenant),
             method: 'POST',
-            body: {
+            body: withTenant({
                 customer_email,
-                seller_email,
-            }
+            }, tenant)
         });
     }
     localStorage.setItem('wishlist', JSON.stringify(wishlist));
@@ -42,6 +43,7 @@ export const addToWishlist = createAsyncThunk('wishlist/addToWishlist', async (p
     const {
         _id,
         quantity,
+        seller_id,
         seller_email,
         customer_email,
         sellingPrice: price,
@@ -57,13 +59,14 @@ export const addToWishlist = createAsyncThunk('wishlist/addToWishlist', async (p
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         const res = await fetchApi('/cart/addWishlist', {
-            headers: {
-                'x-user': seller_email
-            },
-            method: 'POST', body: {
-                seller_email,
+            headers: getTenantHeaders({}, tenant),
+            method: 'POST', body: withTenant({
                 customer_email,
                 productId: _id,
                 quantity,
@@ -72,12 +75,13 @@ export const addToWishlist = createAsyncThunk('wishlist/addToWishlist', async (p
                 category: categoryName,
                 subCategory: subCategoryName,
                 name
-            },
+            }, tenant),
         });
         wishlist = res.wishlist;
     } else {
         wishlist.push({
-            seller_email,
+            seller_id: tenant.sellerId,
+            seller_email: tenant.sellerEmail,
             customer_email,
             productId: _id,
             quantity,
@@ -94,6 +98,7 @@ export const addToWishlist = createAsyncThunk('wishlist/addToWishlist', async (p
 
 // Async thunk for updating item quantity
 export const updateWishlistQuantity = createAsyncThunk('wishlist/updateWishlistQuantity', async ({
+                                                                                         seller_id,
                                                                                          seller_email,
                                                                                          customer_email,
                                                                                          productId,
@@ -111,14 +116,16 @@ export const updateWishlistQuantity = createAsyncThunk('wishlist/updateWishlistQ
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         const res = await fetchApi(`/wishlist/update`, {
-            headers: {
-                'x-user': seller_email
-            },
-            method: 'PUT', body: {
-                seller_email, customer_email, productId, quantity, price, category, subCategory, image, name
-            },
+            headers: getTenantHeaders({}, tenant),
+            method: 'PUT', body: withTenant({
+                customer_email, productId, quantity, price, category, subCategory, image, name
+            }, tenant),
         });
         localStorage.setItem("wishlist", JSON.stringify(res.wishlist));
         wishlist = res.wishlist;
@@ -133,7 +140,7 @@ export const updateWishlistQuantity = createAsyncThunk('wishlist/updateWishlistQ
 
 // Async thunk for removing an item from the wishlist
 export const removeFromWishlist = createAsyncThunk('wishlist/removeFromWishlist', async ({
-                                                                                 seller_email, customer_email, productId
+                                                                                 seller_id, seller_email, customer_email, productId
                                                                              }) => {
     console.log('[removeFromWishlist]')
     let wishlist = [];
@@ -142,14 +149,16 @@ export const removeFromWishlist = createAsyncThunk('wishlist/removeFromWishlist'
     } catch (e) {
 
     }
-    if (customer_email) {
+    const tenant = {
+        sellerId: seller_id || getSellerId(),
+        sellerEmail: seller_email || getSellerEmail()
+    };
+    if (customer_email && tenant.sellerEmail) {
         const res = await fetchApi(`/cart/removeWishlistByProduct`, {
-            headers: {
-                'x-user': seller_email
-            },
-            method: 'DELETE', body: {
-                seller_email, customer_email, productId
-            }
+            headers: getTenantHeaders({}, tenant),
+            method: 'DELETE', body: withTenant({
+                customer_email, productId
+            }, tenant)
         });
         if(res.success){
             wishlist = res.wishlist;

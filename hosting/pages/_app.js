@@ -5,26 +5,43 @@ import "../styles/globals.css";
 import { useEffect } from "react";
 import Layout from "@/components/layout";
 import { updateCart } from "@/utils/util";
+import { useRouter } from "next/router";
+import {StorefrontProvider, useStorefront} from "@/context/StorefrontContext";
+
+function AppShell({Component, pageProps}) {
+  const router = useRouter();
+  const {tenant} = useStorefront();
+  const isSlugStorefront = router.pathname === "/[category]" && !router.asPath.includes("categoryId=");
+
+  useEffect(() => {
+    if (isSlugStorefront) {
+      return;
+    }
+
+    if (tenant?.sellerId && tenant?.sellerEmail) {
+      updateCart(store, tenant);
+    }
+  }, [isSlugStorefront, tenant?.sellerId, tenant?.sellerEmail]);
+
+  const page = <Component {...pageProps} />;
+  return <Layout>{page}</Layout>;
+}
 
 function MyApp({ Component, pageProps }) {
-  useEffect(() => {
-    updateCart(store);
-  }, []);
-
   return (
     <>
       <Head>
         <link rel="icon" href="/favicon.ico" />
-        <title>Explore our premium and stunning Jewellery Online | Tharizan World</title>
+        <title>Modern Hub Storefronts</title>
         <meta
           name="description"
-          content="Shop elegant gold, silver, and diamond jewellery online at Tharizan World. Discover our stunning collection of necklaces, bangles, earrings, rings, and bridal sets - all crafted with precision and timeless elegance. Enjoy secure online shopping and doorstep delivery with Tharizan World."
+          content="Explore Modern Hub promotional products and seller-powered storefronts with slug-based shopping experiences."
         />
       </Head>
       <Provider store={store}>
-        <Layout>
-          <Component {...pageProps} />
-        </Layout>
+        <StorefrontProvider>
+          <AppShell Component={Component} pageProps={pageProps} />
+        </StorefrontProvider>
       </Provider>
     </>
   );

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Sparkles, TrendingUp } from "lucide-react";
 import useFetch from "@/utils/useFetch";
+import {buildCategoryPath, getStoredTenant} from "@/utils/util";
 
 const TRENDING_TAGS = ["Trending Edit", "Top Rated", "Fresh Picks", "Staff Pick"];
 
@@ -11,7 +12,7 @@ export default function CategorySection() {
   const { data: categories, error, isLoading } = useFetch("/getAllCategory");
 
   const handleClick = (name, id) => {
-    router.push(`/${name}?categoryId=${id}`);
+    router.push(buildCategoryPath(name, id, getStoredTenant()));
   };
 
   const renderLoading = () => (
