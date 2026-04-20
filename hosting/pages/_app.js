@@ -7,10 +7,11 @@ import Layout from "@/components/layout";
 import { updateCart } from "@/utils/util";
 import { useRouter } from "next/router";
 import {StorefrontProvider, useStorefront} from "@/context/StorefrontContext";
+import StoreUnavailableScreen from "@/components/StoreUnavailableScreen";
 
 function AppShell({Component, pageProps}) {
   const router = useRouter();
-  const {tenant} = useStorefront();
+  const {tenant, storeUnavailable} = useStorefront();
   const isSlugStorefront = router.pathname === "/[category]" && !router.asPath.includes("categoryId=");
 
   useEffect(() => {
@@ -22,6 +23,10 @@ function AppShell({Component, pageProps}) {
       updateCart(store, tenant);
     }
   }, [isSlugStorefront, tenant?.sellerId, tenant?.sellerEmail]);
+
+  if (isSlugStorefront && storeUnavailable) {
+    return <StoreUnavailableScreen/>;
+  }
 
   const page = <Component {...pageProps} />;
   return <Layout>{page}</Layout>;

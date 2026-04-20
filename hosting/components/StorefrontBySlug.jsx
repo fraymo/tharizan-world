@@ -3,13 +3,9 @@ import {useEffect, useState} from "react";
 import ImageSlider from "@/components/slider";
 import CategorySection from "@/components/categories";
 import FlashSale from "@/components/flashsales";
-import {fetchApi} from "@/utils/util";
+import {clearConsumerSession, fetchStoreConfigBySlugSafe} from "@/utils/util";
 import {useStorefront} from "@/context/StorefrontContext";
-
-const requestHeaders = (value) => ({
-    "Content-Type": "application/json",
-    "x-user": value || "public-storefront"
-});
+import StoreUnavailableScreen from "@/components/StoreUnavailableScreen";
 
 function ModernHubPromo({title = "Modern Hub"}) {
     return (
@@ -37,7 +33,7 @@ function ModernHubPromo({title = "Modern Hub"}) {
 }
 
 export default function StorefrontBySlug({slug}) {
-    const {setTenant} = useStorefront();
+    const {setTenant, markStoreUnavailable} = useStorefront();
     const [state, setState] = useState({loading: true, notFound: false, store: null});
 
     useEffect(() => {
@@ -47,18 +43,28 @@ export default function StorefrontBySlug({slug}) {
             setState({loading: true, notFound: false, store: null});
 
             try {
-                const store = await fetchApi(`/posts/store-config-by-slug/${slug}`, {
-                    method: "GET",
-                    headers: requestHeaders(slug)
-                });
+                const result = await fetchStoreConfigBySlugSafe(slug);
+
+                if (!result.ok || !result.data) {
+                    if (isMounted) {
+                        clearConsumerSession();
+                        markStoreUnavailable();
+                        setState({loading: false, notFound: true, store: null});
+                    }
+                    return;
+                }
+
+                const store = result.data;
 
                 if (isMounted) {
                     setTenant(store);
                     setState({loading: false, notFound: false, store});
                 }
             } catch (error) {
-                console.error("storefront-by-slug", error);
                 if (isMounted) {
+                    clearConsumerSession();
+                    markStoreUnavailable();
+                    console.warn("storefront-by-slug", error?.message || error);
                     setState({loading: false, notFound: true, store: null});
                 }
             }
@@ -71,7 +77,7 @@ export default function StorefrontBySlug({slug}) {
         return () => {
             isMounted = false;
         };
-    }, [slug, setTenant]);
+    }, [slug, setTenant, markStoreUnavailable]);
 
     if (state.loading) {
         return (
@@ -86,24 +92,7 @@ export default function StorefrontBySlug({slug}) {
     }
 
     if (state.notFound) {
-        return (
-            <div>
-                <div className="mx-auto max-w-[1400px] px-4 pt-8">
-                    <div className="rounded-[34px] border border-rose-200 bg-rose-50 px-6 py-8 shadow-sm">
-                        <div className="inline-flex rounded-full bg-white px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-rose-600">
-                            Store not found
-                        </div>
-                        <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-                            We couldn&apos;t find that storefront.
-                        </h1>
-                        <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-500">
-                            The slug may be invalid or unpublished. You can still browse Modern Hub promotional products below.
-                        </p>
-                    </div>
-                </div>
-                <ModernHubPromo title="Modern Hub fallback" />
-            </div>
-        );
+        return <StoreUnavailableScreen/>;
     }
     return (
         <div style={{marginBottom: "3rem"}}>

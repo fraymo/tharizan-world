@@ -3,10 +3,12 @@ import {fetchCart} from "@/redux/cartSlice";
 import {fetchWishlist} from "@/redux/wishlistSlice";
 
 const TENANT_STORAGE_KEY = "modern-hub-tenant";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const apiKey = process.env.NEXT_PUBLIC_API_KEY;
 
 const fetchApi = createApiClient({
-    apiKey: process.env.NEXT_PUBLIC_API_KEY,
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL
+    apiKey,
+    baseURL: apiBaseUrl
 });
 
 const getCustomerEmail = () => {
@@ -40,6 +42,44 @@ const setStoredTenant = (tenant) => {
     }
 
     localStorage.setItem(TENANT_STORAGE_KEY, JSON.stringify(tenant));
+};
+
+const clearConsumerSession = () => {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    localStorage.removeItem(TENANT_STORAGE_KEY);
+    localStorage.removeItem("user");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("customer_email");
+    localStorage.removeItem("cart");
+    localStorage.removeItem("wishlist");
+};
+
+const fetchStoreConfigBySlugSafe = async (slug = "") => {
+    const normalizedSlug = slug?.toString?.().trim?.() || "";
+
+    if (!normalizedSlug) {
+        return {ok: false, status: 400, data: null, message: "Store not found."};
+    }
+
+    const response = await window.fetch(`${apiBaseUrl}/posts/store-config-by-slug/${encodeURIComponent(normalizedSlug)}`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": apiKey,
+            "x-user": normalizedSlug
+        }
+    });
+
+    const data = await response.json().catch(() => ({}));
+    return {
+        ok: response.ok,
+        status: response.status,
+        data: response.ok ? data : null,
+        message: data?.message || "Store not found."
+    };
 };
 
 const getSellerId = () => getStoredTenant()?.sellerId || "";
@@ -260,5 +300,7 @@ export {
     withTenant,
     buildTenantPath,
     buildCategoryPath,
-    buildProductPath
+    buildProductPath,
+    clearConsumerSession,
+    fetchStoreConfigBySlugSafe
 };
